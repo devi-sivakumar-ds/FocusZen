@@ -1,6 +1,6 @@
-# 🚫 Website Blocker Chrome Extension
+# 🧘 ZenFocus Chrome Extension
 
-A powerful Chrome extension that helps you stay focused by blocking distracting websites. Perfect for productivity, studying, or maintaining focus during work hours.
+A powerful Chrome extension that helps you achieve zen-like focus by blocking distracting websites. Perfect for productivity, studying, or maintaining focus during work hours.
 
 ## ✨ Features
 
@@ -54,7 +54,7 @@ A powerful Chrome extension that helps you stay focused by blocking distracting 
 ### Files Structure
 
 ```
-WebsiteBlocker/
+ZenFocus/
 ├── manifest.json          # Extension configuration
 ├── popup.html            # Main popup interface
 ├── popup.js              # Popup functionality
@@ -169,6 +169,6 @@ If you encounter any issues or have questions:
 
 ---
 
-**Happy focusing! 🎯**
+**Happy zen focusing! 🧘‍♀️🎯**
 
 *Built with ❤️ to help you stay productive and focused.* 

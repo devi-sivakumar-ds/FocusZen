@@ -1,6 +1,6 @@
 # 🚀 Quick Installation Guide
 
-## Install the Website Blocker Extension in 5 Steps
+## Install the ZenFocus Extension in 5 Steps
 
 ### Step 1: Download the Extension
 - Download or clone this repository to your computer
@@ -50,4 +50,4 @@
 
 ---
 
-**That's it! You're ready to block distractions and boost productivity! 🚫✨** 
+**That's it! You're ready to achieve zen-like focus and boost productivity! 🧘‍♀️✨** 

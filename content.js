@@ -75,7 +75,7 @@
                 <h1 style="font-size: 48px; margin-bottom: 20px;">🚫</h1>
                 <h2 style="font-size: 32px; margin-bottom: 16px; font-weight: 600;">Website Blocked</h2>
                 <p style="font-size: 18px; margin-bottom: 24px; opacity: 0.9;">
-                    This website has been blocked by the Website Blocker extension to help you stay focused.
+                    This website has been blocked by the ZenFocus extension to help you achieve zen-like focus.
                 </p>
                 <div style="display: flex; gap: 16px; justify-content: center;">
                     <button id="go-back-btn" style="
