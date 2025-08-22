@@ -3,42 +3,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Website Blocker</title>
+    <title>ZenFocus</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="container">
         <header>
             <h1>🧘 ZenFocus</h1>
-            <p>Achieve zen-like focus, block distractions</p>
+            <p>Set time limits for websites. They get locked when exceeded.</p>
         </header>
         
-        <div class="add-site-section">
-            <div class="input-group">
-                <input type="text" id="siteInput" placeholder="Enter website (e.g., facebook.com)" />
-                <button id="addSiteBtn">Add Site</button>
+        <!-- Add Website with Time Limit -->
+        <div class="section">
+            <h3>⏰ Add Website with Time Limit</h3>
+            <p class="section-description">Add a website and set how many minutes you can spend on it per day. It gets locked when you exceed the limit.</p>
+            
+            <div class="add-site-section">
+                <div class="input-group">
+                    <input type="text" id="siteInput" placeholder="Enter website (e.g., facebook.com)" />
+                    <input type="number" id="timeLimitInput" min="1" max="1440" placeholder="30" />
+                    <span class="time-unit">minutes/day</span>
+                    <button id="addSiteBtn">Add Site</button>
+                </div>
             </div>
         </div>
         
-        <div class="blocked-sites-section">
-            <h3>Blocked Websites</h3>
-            <div id="blockedSitesList" class="sites-list">
-                <!-- Blocked sites will be populated here -->
+        <!-- Your Websites -->
+        <div class="section">
+            <h3>🌐 Your Websites</h3>
+            <div id="websitesList" class="websites-list">
+                <!-- Websites will be populated here -->
             </div>
         </div>
         
-        <div class="stats-section">
-            <div class="stat-item">
-                <span class="stat-number" id="totalBlocked">0</span>
-                <span class="stat-label">Sites Blocked</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-number" id="todayBlocked">0</span>
-                <span class="stat-label">Today</span>
+        <!-- Statistics -->
+        <div class="section stats-section">
+            <h3>📊 Today's Progress</h3>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span class="stat-number" id="totalWebsites">0</span>
+                    <span class="stat-label">Websites</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number" id="lockedWebsites">0</span>
+                    <span class="stat-label">Locked</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number" id="activeWebsites">0</span>
+                    <span class="stat-label">Active</span>
+                </div>
             </div>
         </div>
         
-        <div class="toggle-section">
+        <!-- Extension Control -->
+        <div class="section toggle-section">
             <label class="toggle">
                 <input type="checkbox" id="extensionToggle" checked>
                 <span class="slider"></span>

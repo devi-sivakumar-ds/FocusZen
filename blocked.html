@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Website Blocked - ZenFocus</title>
+    <title>Website Locked - ZenFocus</title>
     <style>
         * {
             margin: 0;
@@ -160,13 +160,12 @@
 </head>
 <body>
     <div class="container">
-        <span class="icon">🚫</span>
-        <h1>Website Blocked</h1>
-        <p class="subtitle">Achieve zen-like focus, stay productive</p>
+        <span class="icon">🔒</span>
+        <h1>Website Locked</h1>
+        <p class="subtitle">Daily time limit exceeded</p>
         <p class="description">
-            This website has been blocked by the ZenFocus extension to help you achieve zen-like focus 
-            and avoid distractions. You can manage your blocked sites or temporarily disable the extension 
-            if needed.
+            This website has been locked by ZenFocus because you've exceeded your daily time limit. 
+            The lock will reset tomorrow, or you can reset it manually in the extension.
         </p>
         
         <div class="buttons">
@@ -175,19 +174,19 @@
         </div>
         
         <div class="stats">
-            <h3>Your Progress</h3>
+            <h3>Today's Progress</h3>
             <div class="stats-grid">
                 <div class="stat-item">
-                    <span class="stat-number" id="totalBlocked">0</span>
-                    <span class="stat-label">Sites Blocked</span>
+                    <span class="stat-number" id="totalWebsites">0</span>
+                    <span class="stat-label">Websites</span>
                 </div>
                 <div class="stat-item">
-                    <span class="stat-number" id="todayBlocked">0</span>
-                    <span class="stat-label">Blocked Today</span>
+                    <span class="stat-number" id="lockedWebsites">0</span>
+                    <span class="stat-label">Locked</span>
                 </div>
                 <div class="stat-item">
-                    <span class="stat-number" id="focusTime">0</span>
-                    <span class="stat-label">Focus Hours</span>
+                    <span class="stat-number" id="activeWebsites">0</span>
+                    <span class="stat-label">Active</span>
                 </div>
             </div>
         </div>
@@ -196,16 +195,26 @@
     <script>
         // Load statistics
         function loadStats() {
-            chrome.storage.sync.get(['blockedSites', 'todayBlocked'], function(result) {
-                const blockedSites = result.blockedSites || [];
-                const todayBlocked = result.todayBlocked || 0;
+            chrome.storage.sync.get(['websites'], function(result) {
+                const websites = result.websites || [];
+                const today = new Date().toDateString();
                 
-                document.getElementById('totalBlocked').textContent = blockedSites.length;
-                document.getElementById('todayBlocked').textContent = todayBlocked;
+                let lockedCount = 0;
+                let activeCount = 0;
                 
-                // Calculate focus time (rough estimate: 1 blocked site = 30 minutes saved)
-                const focusHours = Math.round((todayBlocked * 30) / 60);
-                document.getElementById('focusTime').textContent = focusHours;
+                websites.forEach(website => {
+                    if (website.addedDate === today) {
+                        if (website.isLocked) {
+                            lockedCount++;
+                        } else {
+                            activeCount++;
+                        }
+                    }
+                });
+                
+                document.getElementById('totalWebsites').textContent = websites.length;
+                document.getElementById('lockedWebsites').textContent = lockedCount;
+                document.getElementById('activeWebsites').textContent = activeCount;
             });
         }
         
@@ -228,7 +237,7 @@
         
         // Listen for storage changes to update stats
         chrome.storage.onChanged.addListener(function(changes, namespace) {
-            if (namespace === 'sync' && (changes.blockedSites || changes.todayBlocked)) {
+            if (namespace === 'sync' && changes.websites) {
                 loadStats();
             }
         });

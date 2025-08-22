@@ -2,6 +2,26 @@
 (function() {
     'use strict';
     
+    // Check if this page should be blocked based on time limits
+    function checkTimeLimitBlocking() {
+        const hostname = window.location.hostname.toLowerCase();
+        
+        chrome.storage.sync.get(['websites', 'extensionEnabled'], function(result) {
+            const websites = result.websites || [];
+            const isEnabled = result.extensionEnabled !== false;
+            
+            if (!isEnabled) return;
+            
+            const website = websites.find(w => w.domain === hostname || hostname.endsWith('.' + w.domain));
+            
+            if (website && website.isLocked) {
+                // This website is locked due to time limit exceeded
+                window.location.href = chrome.runtime.getURL('blocked.html');
+                return;
+            }
+        });
+    }
+    
     // Check if this page should be blocked
     function checkIfBlocked() {
         const hostname = window.location.hostname.toLowerCase();
@@ -149,10 +169,12 @@
     // Run initial checks
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function() {
+            checkTimeLimitBlocking();
             checkIfBlocked();
             injectBlockingOverlay();
         });
     } else {
+        checkTimeLimitBlocking();
         checkIfBlocked();
         injectBlockingOverlay();
     }
@@ -164,6 +186,7 @@
         if (url !== lastUrl) {
             lastUrl = url;
             setTimeout(() => {
+                checkTimeLimitBlocking();
                 checkIfBlocked();
                 injectBlockingOverlay();
             }, 100);

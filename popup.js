@@ -1,34 +1,72 @@
 document.addEventListener('DOMContentLoaded', function() {
     const siteInput = document.getElementById('siteInput');
+    const timeLimitInput = document.getElementById('timeLimitInput');
     const addSiteBtn = document.getElementById('addSiteBtn');
-    const blockedSitesList = document.getElementById('blockedSitesList');
-    const totalBlocked = document.getElementById('totalBlocked');
-    const todayBlocked = document.getElementById('todayBlocked');
+    const websitesList = document.getElementById('websitesList');
+    const totalWebsites = document.getElementById('totalWebsites');
+    const lockedWebsites = document.getElementById('lockedWebsites');
+    const activeWebsites = document.getElementById('activeWebsites');
     const extensionToggle = document.getElementById('extensionToggle');
-
+    
+    let updateInterval = null;
+    
     // Load initial data
-    loadBlockedSites();
+    loadWebsites();
     loadStats();
     loadExtensionState();
-
+    
+    // Start real-time updates
+    startRealTimeUpdates();
+    
     // Event listeners
-    addSiteBtn.addEventListener('click', addSite);
+    addSiteBtn.addEventListener('click', addWebsite);
     siteInput.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
-            addSite();
+            addWebsite();
         }
     });
-
+    
     extensionToggle.addEventListener('change', toggleExtension);
-
-    function addSite() {
+    
+    function startRealTimeUpdates() {
+        // Update every 10 seconds for more responsive feel
+        updateInterval = setInterval(function() {
+            loadWebsites();
+            loadStats();
+            console.log('Popup: Periodic update triggered');
+        }, 10000);
+        
+        // Also update when popup becomes visible
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                loadWebsites();
+                loadStats();
+                console.log('Popup: Visibility change update triggered');
+            }
+        });
+        
+        // Force immediate update
+        setTimeout(function() {
+            loadWebsites();
+            loadStats();
+            console.log('Popup: Initial update triggered');
+        }, 1000);
+    }
+    
+    function addWebsite() {
         const site = siteInput.value.trim().toLowerCase();
+        const timeLimit = parseInt(timeLimitInput.value);
         
         if (!site) {
             showNotification('Please enter a website URL', 'error');
             return;
         }
-
+        
+        if (!timeLimit || timeLimit < 1 || timeLimit > 1440) {
+            showNotification('Please enter a valid time limit (1-1440 minutes)', 'error');
+            return;
+        }
+        
         // Normalize the URL (remove protocol, www, etc.)
         const normalizedSite = normalizeUrl(site);
         
@@ -36,83 +74,179 @@ document.addEventListener('DOMContentLoaded', function() {
             showNotification('Please enter a valid website URL', 'error');
             return;
         }
-
-        // Check if site is already blocked
-        chrome.storage.sync.get(['blockedSites'], function(result) {
-            const blockedSites = result.blockedSites || [];
+        
+        // Check if site is already added
+        chrome.storage.sync.get(['websites'], function(result) {
+            const websites = result.websites || [];
             
-            if (blockedSites.includes(normalizedSite)) {
-                showNotification('This website is already blocked', 'error');
+            if (websites.some(w => w.domain === normalizedSite)) {
+                showNotification('This website is already added', 'error');
                 return;
             }
-
-            // Add the site
-            blockedSites.push(normalizedSite);
             
-            chrome.storage.sync.set({ blockedSites: blockedSites }, function() {
+            // Add the website with time limit
+            const newWebsite = {
+                domain: normalizedSite,
+                timeLimit: timeLimit,
+                timeSpent: 0,
+                isLocked: false,
+                addedDate: new Date().toDateString(),
+                lastUpdateTime: null
+            };
+            
+            websites.push(newWebsite);
+            
+            chrome.storage.sync.set({ websites: websites }, function() {
                 siteInput.value = '';
-                loadBlockedSites();
+                timeLimitInput.value = '30';
+                loadWebsites();
                 loadStats();
-                showNotification('Website blocked successfully!', 'success');
+                showNotification('Website added successfully!', 'success');
+            });
+        });
+    }
+    
+    function removeWebsite(domain) {
+        chrome.storage.sync.get(['websites'], function(result) {
+            const websites = result.websites || [];
+            const updatedWebsites = websites.filter(w => w.domain !== domain);
+            
+            chrome.storage.sync.set({ websites: updatedWebsites }, function() {
+                loadWebsites();
+                loadStats();
+                showNotification('Website removed successfully!', 'success');
+            });
+        });
+    }
+    
+    function resetWebsite(domain) {
+        chrome.storage.sync.get(['websites'], function(result) {
+            const websites = result.websites || [];
+            const website = websites.find(w => w.domain === domain);
+            
+            if (website) {
+                website.timeSpent = 0;
+                website.isLocked = false;
+                website.lastUpdateTime = null;
                 
-                // Update today's count
-                updateTodayCount();
-            });
+                chrome.storage.sync.set({ websites: websites }, function() {
+                    loadWebsites();
+                    loadStats();
+                    showNotification('Website reset successfully!', 'success');
+                });
+            }
         });
     }
-
-    function removeSite(site) {
-        chrome.storage.sync.get(['blockedSites'], function(result) {
-            const blockedSites = result.blockedSites || [];
-            const updatedSites = blockedSites.filter(s => s !== site);
+    
+    function loadWebsites() {
+        console.log('Popup: Loading websites...');
+        chrome.storage.sync.get(['websites'], function(result) {
+            const websites = result.websites || [];
+            console.log('Popup: Loaded websites from storage:', websites);
             
-            chrome.storage.sync.set({ blockedSites: updatedSites }, function() {
-                loadBlockedSites();
-                loadStats();
-                showNotification('Website unblocked successfully!', 'success');
-            });
-        });
-    }
-
-    function loadBlockedSites() {
-        chrome.storage.sync.get(['blockedSites'], function(result) {
-            const blockedSites = result.blockedSites || [];
-            
-            if (blockedSites.length === 0) {
-                blockedSitesList.innerHTML = `
+            if (websites.length === 0) {
+                websitesList.innerHTML = `
                     <div class="empty-state">
-                        <p>No websites blocked yet</p>
+                        <p>No websites added yet</p>
                         <p>Add a website above to get started</p>
                     </div>
                 `;
             } else {
-                blockedSitesList.innerHTML = blockedSites.map(site => `
-                    <div class="site-item">
-                        <span class="site-url">${site}</span>
-                        <button class="remove-btn" onclick="removeSite('${site}')">Remove</button>
-                    </div>
-                `).join('');
+                const today = new Date().toDateString();
+                console.log('Popup: Today is:', today);
+                
+                const websiteItems = websites.map(website => {
+                    console.log('Popup: Processing website:', website);
+                    
+                    // Check if we need to reset daily time
+                    if (website.addedDate !== today) {
+                        console.log(`Popup: Resetting daily time for ${website.domain}`);
+                        website.timeSpent = 0;
+                        website.isLocked = false;
+                        website.addedDate = today;
+                    }
+                    
+                    // Determine status
+                    let statusClass = '';
+                    let statusText = '';
+                    
+                    if (website.isLocked) {
+                        statusClass = 'locked';
+                        statusText = 'LOCKED';
+                        console.log(`Popup: Website ${website.domain} is locked`);
+                    } else if (website.timeSpent >= website.timeLimit * 0.8) {
+                        statusClass = 'warning';
+                        statusText = 'WARNING';
+                        console.log(`Popup: Website ${website.domain} is in warning zone`);
+                    }
+                    
+                    const timeRemaining = Math.max(0, website.timeLimit - website.timeSpent);
+                    const timeDisplay = `${website.timeSpent}m / ${website.timeLimit}m`;
+                    
+                    // Add progress bar
+                    const progressPercent = Math.min(100, (website.timeSpent / website.timeLimit) * 100);
+                    const progressBar = `
+                        <div class="progress-bar">
+                            <div class="progress-fill ${statusClass}" style="width: ${progressPercent}%"></div>
+                        </div>
+                    `;
+                    
+                    return `
+                        <div class="website-item ${statusClass}">
+                            <div class="website-info">
+                                <div class="website-url">${website.domain}</div>
+                                <div class="website-time">${timeDisplay} (${timeRemaining}m left)</div>
+                                ${progressBar}
+                            </div>
+                            <div class="website-actions">
+                                <button class="reset-btn" onclick="resetWebsite('${website.domain}')" title="Reset daily time">Reset</button>
+                                <button class="remove-btn" onclick="removeWebsite('${website.domain}')" title="Remove website">Remove</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+                websitesList.innerHTML = websiteItems;
+                
+                // Save updated websites with reset times
+                chrome.storage.sync.set({ websites: websites }, function() {
+                    console.log('Popup: Saved updated websites to storage');
+                });
             }
         });
     }
-
+    
     function loadStats() {
-        chrome.storage.sync.get(['blockedSites', 'todayBlocked'], function(result) {
-            const blockedSites = result.blockedSites || [];
-            const todayBlockedCount = result.todayBlocked || 0;
+        chrome.storage.sync.get(['websites'], function(result) {
+            const websites = result.websites || [];
+            const today = new Date().toDateString();
             
-            totalBlocked.textContent = blockedSites.length;
-            todayBlocked.textContent = todayBlockedCount;
+            let lockedCount = 0;
+            let activeCount = 0;
+            
+            websites.forEach(website => {
+                if (website.addedDate === today) {
+                    if (website.isLocked) {
+                        lockedCount++;
+                    } else {
+                        activeCount++;
+                    }
+                }
+            });
+            
+            totalWebsites.textContent = websites.length;
+            lockedWebsites.textContent = lockedCount;
+            activeWebsites.textContent = activeCount;
         });
     }
-
+    
     function loadExtensionState() {
         chrome.storage.sync.get(['extensionEnabled'], function(result) {
             const enabled = result.extensionEnabled !== false; // Default to true
             extensionToggle.checked = enabled;
         });
     }
-
+    
     function toggleExtension() {
         const enabled = extensionToggle.checked;
         
@@ -129,29 +263,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
-
-    function updateTodayCount() {
-        const today = new Date().toDateString();
-        
-        chrome.storage.sync.get(['todayBlocked', 'lastBlockedDate'], function(result) {
-            const lastDate = result.lastBlockedDate;
-            let todayCount = result.todayBlocked || 0;
-            
-            if (lastDate !== today) {
-                todayCount = 1;
-            } else {
-                todayCount++;
-            }
-            
-            chrome.storage.sync.set({ 
-                todayBlocked: todayCount,
-                lastBlockedDate: today
-            }, function() {
-                loadStats();
-            });
-        });
-    }
-
+    
     function normalizeUrl(url) {
         // Remove protocol, www, and trailing slashes
         let normalized = url.replace(/^https?:\/\//, '');
@@ -165,7 +277,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         return normalized;
     }
-
+    
     function showNotification(message, type = 'info') {
         // Create notification element
         const notification = document.createElement('div');
@@ -221,7 +333,15 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 300);
         }, 3000);
     }
-
-    // Make removeSite function globally accessible
-    window.removeSite = removeSite;
+    
+    // Cleanup when popup is closed
+    window.addEventListener('beforeunload', function() {
+        if (updateInterval) {
+            clearInterval(updateInterval);
+        }
+    });
+    
+    // Make functions globally accessible
+    window.removeWebsite = removeWebsite;
+    window.resetWebsite = resetWebsite;
 }); 
