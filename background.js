@@ -22,7 +22,7 @@ function startPeriodicUpdates() {
             updateActiveTabTime();
             checkAndLockWebsites();
         }
-    }, 30000); // Update every 30 seconds
+    }, 15000); // Update every 15 seconds for more responsive blocking
 }
 
 // Listen for messages from popup
@@ -235,11 +235,48 @@ function checkAndLockWebsites() {
             
             console.log(`Locking website: ${website.domain} (${website.timeSpent}m >= ${website.timeLimit}m)`);
             
-            // Block all tabs with this website
+            // Show notification to user
+            showTimeLimitNotification(website);
+            
+            // Block all tabs with this website immediately
             chrome.tabs.query({ url: `*://${website.domain}/*` }, function(tabs) {
                 tabs.forEach(tab => {
-                    chrome.tabs.update(tab.id, {
-                        url: chrome.runtime.getURL('blocked.html')
+                    // Send message to content script to block immediately
+                    chrome.tabs.sendMessage(tab.id, { 
+                        action: 'blockImmediately' 
+                    }, function(response) {
+                        // If content script doesn't respond, fall back to tab update
+                        if (chrome.runtime.lastError) {
+                            console.log('Content script not responding, using tab update fallback');
+                            const blockedUrl = chrome.runtime.getURL('blocked.html');
+                            console.log('Background script blocked URL:', blockedUrl);
+                            
+                            if (blockedUrl && blockedUrl.startsWith('chrome-extension://') && !blockedUrl.includes('invalid')) {
+                                chrome.tabs.update(tab.id, {
+                                    url: blockedUrl
+                                });
+                            } else {
+                                console.error('❌ Invalid blocked URL in background script:', blockedUrl);
+                                // Try to create a simple blocked page
+                                chrome.tabs.update(tab.id, {
+                                    url: 'data:text/html,<html><body><h1>Website Blocked</h1><p>Time limit exceeded</p></body></html>'
+                                });
+                            }
+                        }
+                    });
+                });
+            });
+        } else if (website.timeSpent >= website.timeLimit * 0.9 && !website.isLocked && !website.warningShown) {
+            // Show warning when 90% of time is used
+            website.warningShown = true;
+            showTimeWarningNotification(website);
+            
+            // Send warning to content script
+            chrome.tabs.query({ url: `*://${website.domain}/*` }, function(tabs) {
+                tabs.forEach(tab => {
+                    chrome.tabs.sendMessage(tab.id, { 
+                        action: 'showWarning',
+                        website: website
                     });
                 });
             });
@@ -249,6 +286,30 @@ function checkAndLockWebsites() {
     if (updated) {
         chrome.storage.sync.set({ websites: websites });
     }
+}
+
+// Show notification when time limit is exceeded
+function showTimeLimitNotification(website) {
+    const timeOver = website.timeSpent - website.timeLimit;
+    
+    chrome.notifications.create({
+        type: 'basic',
+        iconUrl: chrome.runtime.getURL('icon.svg'),
+        title: '⏰ Time Limit Exceeded!',
+        message: `${website.domain} has been locked. You spent ${timeOver} minutes over your ${website.timeLimit} minute limit.`
+    });
+}
+
+// Show warning notification when approaching time limit
+function showTimeWarningNotification(website) {
+    const timeRemaining = website.timeLimit - website.timeSpent;
+    
+    chrome.notifications.create({
+        type: 'basic',
+        iconUrl: chrome.runtime.getURL('icon.svg'),
+        title: '⚠️ Time Limit Warning!',
+        message: `${website.domain}: Only ${timeRemaining} minutes remaining before lock.`
+    });
 }
 
 // Block navigation to locked websites
@@ -264,10 +325,22 @@ chrome.webNavigation.onBeforeNavigate.addListener(function(details) {
         
         if (website && website.isLocked) {
             console.log(`Blocking navigation to locked website: ${website.domain}`);
-            // Block the navigation
-            chrome.tabs.update(details.tabId, {
-                url: chrome.runtime.getURL('blocked.html')
-            });
+            
+            const blockedUrl = chrome.runtime.getURL('blocked.html');
+            console.log('Navigation blocking blocked URL:', blockedUrl);
+            
+            if (blockedUrl && blockedUrl.startsWith('chrome-extension://') && !blockedUrl.includes('invalid')) {
+                // Block the navigation
+                chrome.tabs.update(details.tabId, {
+                    url: blockedUrl
+                });
+            } else {
+                console.error('❌ Invalid blocked URL in navigation blocking:', blockedUrl);
+                // Use data URL as fallback
+                chrome.tabs.update(details.tabId, {
+                    url: 'data:text/html,<html><body><h1>Website Blocked</h1><p>This website is locked due to time limit exceeded.</p></body></html>'
+                });
+            }
         }
     } catch (e) {
         console.log('Error in navigation blocking:', e);

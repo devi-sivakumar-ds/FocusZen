@@ -107,19 +107,29 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function removeWebsite(domain) {
+        console.log('🗑️ Removing website:', domain);
+        
         chrome.storage.sync.get(['websites'], function(result) {
             const websites = result.websites || [];
             const updatedWebsites = websites.filter(w => w.domain !== domain);
             
             chrome.storage.sync.set({ websites: updatedWebsites }, function() {
-                loadWebsites();
-                loadStats();
-                showNotification('Website removed successfully!', 'success');
+                if (chrome.runtime.lastError) {
+                    console.error('Error removing website:', chrome.runtime.lastError);
+                    showNotification('Error removing website', 'error');
+                } else {
+                    console.log('✅ Website removed successfully');
+                    loadWebsites();
+                    loadStats();
+                    showNotification('Website removed successfully!', 'success');
+                }
             });
         });
     }
     
     function resetWebsite(domain) {
+        console.log('🔄 Resetting website:', domain);
+        
         chrome.storage.sync.get(['websites'], function(result) {
             const websites = result.websites || [];
             const website = websites.find(w => w.domain === domain);
@@ -130,10 +140,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 website.lastUpdateTime = null;
                 
                 chrome.storage.sync.set({ websites: websites }, function() {
-                    loadWebsites();
-                    loadStats();
-                    showNotification('Website reset successfully!', 'success');
+                    if (chrome.runtime.lastError) {
+                        console.error('Error resetting website:', chrome.runtime.lastError);
+                        showNotification('Error resetting website', 'error');
+                    } else {
+                        console.log('✅ Website reset successfully');
+                        loadWebsites();
+                        loadStats();
+                        showNotification('Website reset successfully!', 'success');
+                    }
                 });
+            } else {
+                console.error('Website not found for reset:', domain);
+                showNotification('Website not found', 'error');
             }
         });
     }
@@ -199,8 +218,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                 ${progressBar}
                             </div>
                             <div class="website-actions">
-                                <button class="reset-btn" onclick="resetWebsite('${website.domain}')" title="Reset daily time">Reset</button>
-                                <button class="remove-btn" onclick="removeWebsite('${website.domain}')" title="Remove website">Remove</button>
+                                <button class="reset-btn" data-domain="${website.domain}" title="Reset daily time">Reset</button>
+                                <button class="remove-btn" data-domain="${website.domain}" title="Remove website">Remove</button>
                             </div>
                         </div>
                     `;
@@ -208,11 +227,37 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 websitesList.innerHTML = websiteItems;
                 
+                // Add event listeners to the buttons
+                addButtonEventListeners();
+                
                 // Save updated websites with reset times
                 chrome.storage.sync.set({ websites: websites }, function() {
                     console.log('Popup: Saved updated websites to storage');
                 });
             }
+        });
+    }
+    
+    // Add event listeners to buttons after they're created
+    function addButtonEventListeners() {
+        // Add event listeners to reset buttons
+        const resetButtons = document.querySelectorAll('.reset-btn');
+        resetButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const domain = this.getAttribute('data-domain');
+                console.log('Reset button clicked for domain:', domain);
+                resetWebsite(domain);
+            });
+        });
+        
+        // Add event listeners to remove buttons
+        const removeButtons = document.querySelectorAll('.remove-btn');
+        removeButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const domain = this.getAttribute('data-domain');
+                console.log('Remove button clicked for domain:', domain);
+                removeWebsite(domain);
+            });
         });
     }
     
@@ -341,7 +386,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Make functions globally accessible
-    window.removeWebsite = removeWebsite;
-    window.resetWebsite = resetWebsite;
+    // Functions are now accessible through event listeners
+    // No need to make them global
 }); 

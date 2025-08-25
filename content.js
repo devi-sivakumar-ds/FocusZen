@@ -16,10 +16,98 @@
             
             if (website && website.isLocked) {
                 // This website is locked due to time limit exceeded
-                window.location.href = chrome.runtime.getURL('blocked.html');
+                console.log('🔒 Website is locked, redirecting to blocked page');
+                
+                // Get the blocked page URL and verify it's valid
+                const blockedUrl = chrome.runtime.getURL('blocked.html');
+                console.log('🔒 Blocked URL:', blockedUrl);
+                
+                if (blockedUrl && blockedUrl.startsWith('chrome-extension://') && !blockedUrl.includes('invalid')) {
+                    window.location.href = blockedUrl;
+                } else {
+                    console.error('❌ Invalid blocked URL:', blockedUrl);
+                    // Fallback: show blocking overlay
+                    createBlockingOverlay();
+                }
                 return;
             }
+            
+            // Check if approaching time limit (90%)
+            if (website && !website.isLocked && website.timeSpent >= website.timeLimit * 0.9) {
+                showTimeWarning(website);
+            }
         });
+    }
+    
+    // Show time warning overlay
+    function showTimeWarning(website) {
+        // Remove any existing warning
+        const existingWarning = document.getElementById('time-warning-overlay');
+        if (existingWarning) {
+            existingWarning.remove();
+        }
+        
+        const timeRemaining = website.timeLimit - website.timeSpent;
+        
+        const warning = document.createElement('div');
+        warning.id = 'time-warning-overlay';
+        warning.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+            color: #333;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            z-index: 999999;
+            max-width: 300px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            animation: slideIn 0.5s ease;
+        `;
+        
+        warning.innerHTML = `
+            <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                <span style="font-size: 24px; margin-right: 10px;">⚠️</span>
+                <h3 style="margin: 0; font-size: 16px;">Time Warning!</h3>
+            </div>
+            <p style="margin: 0 0 15px 0; font-size: 14px; line-height: 1.4;">
+                You have <strong>${timeRemaining} minutes</strong> remaining on ${website.domain}
+            </p>
+            <button id="dismiss-warning" style="
+                background: rgba(255,255,255,0.9);
+                border: none;
+                padding: 8px 16px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: 500;
+            ">Dismiss</button>
+        `;
+        
+        // Add CSS animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+        `;
+        document.head.appendChild(style);
+        
+        // Add event listener to dismiss button
+        warning.querySelector('#dismiss-warning').addEventListener('click', function() {
+            warning.remove();
+        });
+        
+        // Auto-dismiss after 10 seconds
+        setTimeout(() => {
+            if (warning.parentNode) {
+                warning.remove();
+            }
+        }, 10000);
+        
+        document.body.appendChild(warning);
     }
     
     // Check if this page should be blocked
@@ -163,6 +251,26 @@
         if (request.action === 'checkBlocked') {
             checkIfBlocked();
             sendResponse({ success: true });
+        } else if (request.action === 'blockImmediately') {
+            // Background script is telling us to block immediately
+            console.log('🔒 Received immediate block command');
+            
+            // Get the blocked page URL and verify it's valid
+            const blockedUrl = chrome.runtime.getURL('blocked.html');
+            console.log('🔒 Blocked URL from message:', blockedUrl);
+            
+            if (blockedUrl && blockedUrl.startsWith('chrome-extension://') && !blockedUrl.includes('invalid')) {
+                window.location.href = blockedUrl;
+            } else {
+                console.error('❌ Invalid blocked URL from message:', blockedUrl);
+                // Fallback: show blocking overlay
+                createBlockingOverlay();
+            }
+            sendResponse({ success: true });
+        } else if (request.action === 'showWarning') {
+            // Background script is telling us to show a warning
+            showTimeWarning(request.website);
+            sendResponse({ success: true });
         }
     });
     
@@ -178,6 +286,11 @@
         checkIfBlocked();
         injectBlockingOverlay();
     }
+    
+    // Also check periodically for immediate blocking
+    setInterval(function() {
+        checkTimeLimitBlocking();
+    }, 5000); // Check every 5 seconds
     
     // Also check when the page changes (for SPA applications)
     let lastUrl = location.href;
