@@ -2,31 +2,91 @@
 (function() {
     'use strict';
     
-    // Check if this page should be blocked based on time limits
-    function checkTimeLimitBlocking() {
-        const hostname = window.location.hostname.toLowerCase();
+    // Check if extension context is still valid
+    function isExtensionValid() {
+        try {
+            return typeof chrome !== 'undefined' && 
+                   chrome.runtime && 
+                   chrome.runtime.id && 
+                   !chrome.runtime.lastError;
+        } catch (e) {
+            return false;
+        }
+    }
+    
+    // Safe wrapper for chrome API calls
+    function safeChromeCall(callback) {
+        if (!isExtensionValid()) {
+            console.log('Extension context invalid, skipping operation');
+            return;
+        }
         
-        chrome.storage.sync.get(['websites', 'extensionEnabled'], function(result) {
-            const websites = result.websites || [];
-            const isEnabled = result.extensionEnabled !== false;
-            
-            if (!isEnabled) return;
-            
-            const website = websites.find(w => w.domain === hostname || hostname.endsWith('.' + w.domain));
-            
-            if (website && website.isLocked) {
-                // This website is locked due to time limit exceeded
-                console.log('�� Website is locked, showing blocking overlay');
-                
-                // Instead of redirecting, show the blocking overlay directly
-                createTimeLimitBlockingOverlay(website);
+        try {
+            callback();
+        } catch (e) {
+            if (e.message && e.message.includes('Extension context invalidated')) {
+                console.log('Extension context invalidated, removing content script');
+                // Clean up and stop execution
+                cleanup();
                 return;
             }
-            
-            // Check if approaching time limit (90%)
-            if (website && !website.isLocked && website.timeSpent >= website.timeLimit * 0.9) {
-                showTimeWarning(website);
-            }
+            console.error('Error in chrome API call:', e);
+        }
+    }
+    
+    // Cleanup function
+    function cleanup() {
+        // Remove any overlays
+        const overlays = document.querySelectorAll('[id*="overlay"]');
+        overlays.forEach(overlay => overlay.remove());
+        
+        // Remove event listeners
+        if (window.cleanupInterval) {
+            clearInterval(window.cleanupInterval);
+        }
+        
+        // Stop all timers
+        if (window.checkInterval) {
+            clearInterval(window.checkInterval);
+        }
+        
+        console.log('Content script cleaned up');
+    }
+    
+    // Check if this page should be blocked based on time limits
+    function checkTimeLimitBlocking() {
+        if (!isExtensionValid()) return;
+        
+        const hostname = window.location.hostname.toLowerCase();
+        
+        safeChromeCall(() => {
+            chrome.storage.sync.get(['websites', 'extensionEnabled'], function(result) {
+                if (chrome.runtime.lastError) {
+                    console.log('Storage error:', chrome.runtime.lastError);
+                    return;
+                }
+                
+                const websites = result.websites || [];
+                const isEnabled = result.extensionEnabled !== false;
+                
+                if (!isEnabled) return;
+                
+                const website = websites.find(w => w.domain === hostname || hostname.endsWith('.' + w.domain));
+                
+                if (website && website.isLocked) {
+                    // This website is locked due to time limit exceeded
+                    console.log('🔒 Website is locked, showing blocking overlay');
+                    
+                    // Instead of redirecting, show the blocking overlay directly
+                    createTimeLimitBlockingOverlay(website);
+                    return;
+                }
+                
+                // Check if approaching time limit (90%)
+                if (website && !website.isLocked && website.timeSpent >= website.timeLimit * 0.9) {
+                    showTimeWarning(website);
+                }
+            });
         });
     }
     
@@ -121,41 +181,59 @@
     
     // Check if this page should be blocked
     function checkIfBlocked() {
+        if (!isExtensionValid()) return;
+        
         const hostname = window.location.hostname.toLowerCase();
         
-        chrome.storage.sync.get(['blockedSites', 'extensionEnabled'], function(result) {
-            const blockedSites = result.blockedSites || [];
-            const isEnabled = result.extensionEnabled !== false;
-            
-            if (!isEnabled) return;
-            
-            for (const blockedSite of blockedSites) {
-                if (hostname === blockedSite || hostname.endsWith('.' + blockedSite)) {
-                    // This page should be blocked - content script will handle it
-                    console.log('Website should be blocked, but content script will handle display');
+        safeChromeCall(() => {
+            chrome.storage.sync.get(['blockedSites', 'extensionEnabled'], function(result) {
+                if (chrome.runtime.lastError) {
+                    console.log('Storage error:', chrome.runtime.lastError);
                     return;
                 }
-            }
+                
+                const blockedSites = result.blockedSites || [];
+                const isEnabled = result.extensionEnabled !== false;
+                
+                if (!isEnabled) return;
+                
+                for (const blockedSite of blockedSites) {
+                    if (hostname === blockedSite || hostname.endsWith('.' + blockedSite)) {
+                        // This page should be blocked - content script will handle it
+                        console.log('Website should be blocked, but content script will handle display');
+                        return;
+                    }
+                }
+            });
         });
     }
     
     // Inject a blocking overlay if needed (fallback)
     function injectBlockingOverlay() {
+        if (!isExtensionValid()) return;
+        
         const hostname = window.location.hostname.toLowerCase();
         
-        chrome.storage.sync.get(['blockedSites', 'extensionEnabled'], function(result) {
-            const blockedSites = result.blockedSites || [];
-            const isEnabled = result.extensionEnabled !== false;
-            
-            if (!isEnabled) return;
-            
-            for (const blockedSite of blockedSites) {
-                if (hostname === blockedSite || hostname.endsWith('.' + blockedSite)) {
-                    // Content script will handle blocking display
-                    console.log('Website should be blocked, but content script will handle display');
+        safeChromeCall(() => {
+            chrome.storage.sync.get(['blockedSites', 'extensionEnabled'], function(result) {
+                if (chrome.runtime.lastError) {
+                    console.log('Storage error:', chrome.runtime.lastError);
                     return;
                 }
-            }
+                
+                const blockedSites = result.blockedSites || [];
+                const isEnabled = result.extensionEnabled !== false;
+                
+                if (!isEnabled) return;
+                
+                for (const blockedSite of blockedSites) {
+                    if (hostname === blockedSite || hostname.endsWith('.' + blockedSite)) {
+                        // Content script will handle blocking display
+                        console.log('Website should be blocked, but content script will handle display');
+                        return;
+                    }
+                }
+            });
         });
     }
     
@@ -277,39 +355,62 @@
     
     // Listen for messages from background script
     chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
-        if (request.action === 'checkBlocked') {
-            checkIfBlocked();
-            sendResponse({ success: true });
-        } else if (request.action === 'blockImmediately') {
-            // Background script is telling us to block immediately
-            console.log('🔒 Received immediate block command');
-            
-            // Get the website info to show in the overlay
-            chrome.storage.sync.get(['websites'], function(result) {
-                const websites = result.websites || [];
-                const currentDomain = window.location.hostname.toLowerCase();
-                const website = websites.find(w => 
-                    w.domain === currentDomain || currentDomain.endsWith('.' + w.domain)
-                );
+        if (!isExtensionValid()) {
+            console.log('Extension context invalid, ignoring message');
+            return;
+        }
+        
+        try {
+            if (request.action === 'checkBlocked') {
+                checkIfBlocked();
+                sendResponse({ success: true });
+            } else if (request.action === 'blockImmediately') {
+                // Background script is telling us to block immediately
+                console.log('🔒 Received immediate block command');
                 
-                if (website) {
-                    createTimeLimitBlockingOverlay(website);
-                } else {
-                    // Fallback if website not found
-                    createGenericBlockingOverlay();
-                }
-            });
-            
-            sendResponse({ success: true });
-        } else if (request.action === 'showWarning') {
-            // Background script is telling us to show a warning
-            showTimeWarning(request.website);
-            sendResponse({ success: true });
+                // Get the website info to show in the overlay
+                safeChromeCall(() => {
+                    chrome.storage.sync.get(['websites'], function(result) {
+                        if (chrome.runtime.lastError) {
+                            console.log('Storage error:', chrome.runtime.lastError);
+                            return;
+                        }
+                        
+                        const websites = result.websites || [];
+                        const currentDomain = window.location.hostname.toLowerCase();
+                        const website = websites.find(w => 
+                            w.domain === currentDomain || currentDomain.endsWith('.' + w.domain)
+                        );
+                        
+                        if (website) {
+                            createTimeLimitBlockingOverlay(website);
+                        } else {
+                            // Fallback if website not found
+                            createGenericBlockingOverlay();
+                        }
+                    });
+                });
+                
+                sendResponse({ success: true });
+            } else if (request.action === 'showWarning') {
+                // Background script is telling us to show a warning
+                showTimeWarning(request.website);
+                sendResponse({ success: true });
+            }
+        } catch (e) {
+            if (e.message && e.message.includes('Extension context invalidated')) {
+                console.log('Extension context invalidated in message listener');
+                cleanup();
+                return;
+            }
+            console.error('Error in message listener:', e);
         }
     });
     
     // Create a generic blocking overlay if website info is not available
     function createGenericBlockingOverlay() {
+        if (!isExtensionValid()) return;
+        
         const overlay = document.createElement('div');
         overlay.id = 'generic-blocking-overlay';
         overlay.style.cssText = `
@@ -364,33 +465,55 @@
     // Run initial checks
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function() {
+            if (isExtensionValid()) {
+                checkTimeLimitBlocking();
+                checkIfBlocked();
+                injectBlockingOverlay();
+            }
+        });
+    } else {
+        if (isExtensionValid()) {
             checkTimeLimitBlocking();
             checkIfBlocked();
             injectBlockingOverlay();
-        });
-    } else {
-        checkTimeLimitBlocking();
-        checkIfBlocked();
-        injectBlockingOverlay();
+        }
     }
     
     // Also check periodically for immediate blocking
-    setInterval(function() {
-        checkTimeLimitBlocking();
-    }, 5000); // Check every 5 seconds
+    if (isExtensionValid()) {
+        window.checkInterval = setInterval(function() {
+            if (isExtensionValid()) {
+                checkTimeLimitBlocking();
+            } else {
+                console.log('Extension context invalid, stopping periodic checks');
+                clearInterval(window.checkInterval);
+                cleanup();
+            }
+        }, 5000); // Check every 5 seconds
+    }
     
     // Also check when the page changes (for SPA applications)
     let lastUrl = location.href;
     new MutationObserver(() => {
+        if (!isExtensionValid()) return;
+        
         const url = location.href;
         if (url !== lastUrl) {
             lastUrl = url;
             setTimeout(() => {
-                checkTimeLimitBlocking();
-                checkIfBlocked();
-                injectBlockingOverlay();
+                if (isExtensionValid()) {
+                    checkTimeLimitBlocking();
+                    checkIfBlocked();
+                    injectBlockingOverlay();
+                }
             }, 100);
         }
     }).observe(document, { subtree: true, childList: true });
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', cleanup);
+    
+    // The extension context validation in isExtensionValid() function
+    // will handle detecting when the extension becomes invalid
     
 })(); 

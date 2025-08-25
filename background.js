@@ -240,16 +240,24 @@ function checkAndLockWebsites() {
             
             // Send message to content script to show blocking overlay
             chrome.tabs.query({ url: `*://${website.domain}/*` }, function(tabs) {
+                if (chrome.runtime.lastError) {
+                    console.log('Error querying tabs:', chrome.runtime.lastError);
+                    return;
+                }
+                
                 tabs.forEach(tab => {
-                    // Send message to content script to block immediately
-                    chrome.tabs.sendMessage(tab.id, { 
-                        action: 'blockImmediately' 
-                    }, function(response) {
-                        // If content script doesn't respond, log it
-                        if (chrome.runtime.lastError) {
-                            console.log('Content script not responding for tab:', tab.id);
-                        }
-                    });
+                    // Check if tab is still valid
+                    if (tab.id && tab.status === 'complete') {
+                        // Send message to content script to block immediately
+                        chrome.tabs.sendMessage(tab.id, { 
+                            action: 'blockImmediately' 
+                        }, function(response) {
+                            // If content script doesn't respond, log it
+                            if (chrome.runtime.lastError) {
+                                console.log('Content script not responding for tab:', tab.id);
+                            }
+                        });
+                    }
                 });
             });
         } else if (website.timeSpent >= website.timeLimit * 0.9 && !website.isLocked && !website.warningShown) {
@@ -259,11 +267,18 @@ function checkAndLockWebsites() {
             
             // Send warning to content script
             chrome.tabs.query({ url: `*://${website.domain}/*` }, function(tabs) {
+                if (chrome.runtime.lastError) {
+                    console.log('Error querying tabs for warning:', chrome.runtime.lastError);
+                    return;
+                }
+                
                 tabs.forEach(tab => {
-                    chrome.tabs.sendMessage(tab.id, { 
-                        action: 'showWarning',
-                        website: website
-                    });
+                    if (tab.id && tab.status === 'complete') {
+                        chrome.tabs.sendMessage(tab.id, { 
+                            action: 'showWarning',
+                            website: website
+                        });
+                    }
                 });
             });
         }
