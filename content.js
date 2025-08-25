@@ -131,9 +131,8 @@
             
             for (const blockedSite of blockedSites) {
                 if (hostname === blockedSite || hostname.endsWith('.' + blockedSite)) {
-                    // This page should be blocked, but if we're here, it means the background script didn't catch it
-                    // Redirect to the blocked page
-                    window.location.href = chrome.runtime.getURL('blocked.html');
+                    // This page should be blocked - content script will handle it
+                    console.log('Website should be blocked, but content script will handle display');
                     return;
                 }
             }
@@ -152,130 +151,12 @@
             
             for (const blockedSite of blockedSites) {
                 if (hostname === blockedSite || hostname.endsWith('.' + blockedSite)) {
-                    createBlockingOverlay();
+                    // Content script will handle blocking display
+                    console.log('Website should be blocked, but content script will handle display');
                     return;
                 }
             }
         });
-    }
-    
-    // Create a blocking overlay
-    function createBlockingOverlay() {
-        // Remove any existing overlay
-        const existingOverlay = document.getElementById('website-blocker-overlay');
-        if (existingOverlay) {
-            existingOverlay.remove();
-        }
-        
-        // Create overlay
-        const overlay = document.createElement('div');
-        overlay.id = 'website-blocker-overlay';
-        overlay.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            z-index: 999999;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            text-align: center;
-        `;
-        
-        // Create content using DOM methods instead of innerHTML
-        const contentDiv = document.createElement('div');
-        contentDiv.style.cssText = 'max-width: 500px; padding: 40px;';
-        
-        const icon = document.createElement('h1');
-        icon.style.cssText = 'font-size: 48px; margin-bottom: 20px;';
-        icon.textContent = '🚫';
-        
-        const title = document.createElement('h2');
-        title.style.cssText = 'font-size: 32px; margin-bottom: 16px; font-weight: 600;';
-        title.textContent = 'Website Blocked';
-        
-        const description = document.createElement('p');
-        description.style.cssText = 'font-size: 18px; margin-bottom: 24px; opacity: 0.9;';
-        description.textContent = 'This website has been blocked by the ZenFocus extension to help you achieve zen-like focus.';
-        
-        const buttonContainer = document.createElement('div');
-        buttonContainer.style.cssText = 'display: flex; gap: 16px; justify-content: center;';
-        
-        const goBackBtn = document.createElement('button');
-        goBackBtn.id = 'go-back-btn';
-        goBackBtn.style.cssText = `
-            padding: 12px 24px;
-            background: rgba(255, 255, 255, 0.2);
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-radius: 8px;
-            color: white;
-            font-size: 16px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        `;
-        goBackBtn.textContent = 'Go Back';
-        
-        const manageSitesBtn = document.createElement('button');
-        manageSitesBtn.id = 'manage-sites-btn';
-        manageSitesBtn.style.cssText = `
-            padding: 12px 24px;
-            background: rgba(255, 255, 255, 0.9);
-            border: none;
-            border-radius: 8px;
-            color: #333;
-            font-size: 16px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        `;
-        manageSitesBtn.textContent = 'Manage Sites';
-        
-        // Add event listeners
-        goBackBtn.addEventListener('click', function() {
-            window.history.back();
-        });
-        
-        manageSitesBtn.addEventListener('click', function() {
-            chrome.runtime.sendMessage({ action: 'openPopup' });
-        });
-        
-        // Add hover effects
-        goBackBtn.addEventListener('mouseenter', function() {
-            this.style.background = 'rgba(255, 255, 255, 0.3)';
-        });
-        
-        goBackBtn.addEventListener('mouseleave', function() {
-            this.style.background = 'rgba(255, 255, 255, 0.2)';
-        });
-        
-        manageSitesBtn.addEventListener('mouseenter', function() {
-            this.style.background = 'rgba(255, 255, 255, 1)';
-        });
-        
-        manageSitesBtn.addEventListener('mouseleave', function() {
-            this.style.background = 'rgba(255, 255, 255, 0.9)';
-        });
-        
-        // Assemble the overlay
-        buttonContainer.appendChild(goBackBtn);
-        buttonContainer.appendChild(manageSitesBtn);
-        
-        contentDiv.appendChild(icon);
-        contentDiv.appendChild(title);
-        contentDiv.appendChild(description);
-        contentDiv.appendChild(buttonContainer);
-        
-        overlay.appendChild(contentDiv);
-        
-        // Insert overlay
-        document.body.appendChild(overlay);
-        
-        // Prevent scrolling
-        document.body.style.overflow = 'hidden';
     }
     
     // Create a blocking overlay when time limit is exceeded

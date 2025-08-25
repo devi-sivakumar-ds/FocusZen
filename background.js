@@ -245,7 +245,7 @@ function checkAndLockWebsites() {
                     chrome.tabs.sendMessage(tab.id, { 
                         action: 'blockImmediately' 
                     }, function(response) {
-                        // If content script doesn't respond, log it but don't try to redirect
+                        // If content script doesn't respond, log it
                         if (chrome.runtime.lastError) {
                             console.log('Content script not responding for tab:', tab.id);
                         }
@@ -310,11 +310,8 @@ chrome.webNavigation.onBeforeNavigate.addListener(function(details) {
         const website = websites.find(w => w.domain === hostname || hostname.endsWith('.' + w.domain));
         
         if (website && website.isLocked) {
-            console.log(`Blocking navigation to locked website: ${website.domain}`);
-            
-            // Instead of redirecting, let the content script handle the blocking
-            // The content script will show the overlay when the page loads
-            console.log('Navigation blocked - content script will handle display');
+            console.log(`Navigation to locked website blocked: ${website.domain}`);
+            // Content script will handle the blocking display when the page loads
         }
     } catch (e) {
         console.log('Error in navigation blocking:', e);
