@@ -238,30 +238,16 @@ function checkAndLockWebsites() {
             // Show notification to user
             showTimeLimitNotification(website);
             
-            // Block all tabs with this website immediately
+            // Send message to content script to show blocking overlay
             chrome.tabs.query({ url: `*://${website.domain}/*` }, function(tabs) {
                 tabs.forEach(tab => {
                     // Send message to content script to block immediately
                     chrome.tabs.sendMessage(tab.id, { 
                         action: 'blockImmediately' 
                     }, function(response) {
-                        // If content script doesn't respond, fall back to tab update
+                        // If content script doesn't respond, log it but don't try to redirect
                         if (chrome.runtime.lastError) {
-                            console.log('Content script not responding, using tab update fallback');
-                            const blockedUrl = chrome.runtime.getURL('blocked.html');
-                            console.log('Background script blocked URL:', blockedUrl);
-                            
-                            if (blockedUrl && blockedUrl.startsWith('chrome-extension://') && !blockedUrl.includes('invalid')) {
-                                chrome.tabs.update(tab.id, {
-                                    url: blockedUrl
-                                });
-                            } else {
-                                console.error('❌ Invalid blocked URL in background script:', blockedUrl);
-                                // Try to create a simple blocked page
-                                chrome.tabs.update(tab.id, {
-                                    url: 'data:text/html,<html><body><h1>Website Blocked</h1><p>Time limit exceeded</p></body></html>'
-                                });
-                            }
+                            console.log('Content script not responding for tab:', tab.id);
                         }
                     });
                 });
@@ -326,21 +312,9 @@ chrome.webNavigation.onBeforeNavigate.addListener(function(details) {
         if (website && website.isLocked) {
             console.log(`Blocking navigation to locked website: ${website.domain}`);
             
-            const blockedUrl = chrome.runtime.getURL('blocked.html');
-            console.log('Navigation blocking blocked URL:', blockedUrl);
-            
-            if (blockedUrl && blockedUrl.startsWith('chrome-extension://') && !blockedUrl.includes('invalid')) {
-                // Block the navigation
-                chrome.tabs.update(details.tabId, {
-                    url: blockedUrl
-                });
-            } else {
-                console.error('❌ Invalid blocked URL in navigation blocking:', blockedUrl);
-                // Use data URL as fallback
-                chrome.tabs.update(details.tabId, {
-                    url: 'data:text/html,<html><body><h1>Website Blocked</h1><p>This website is locked due to time limit exceeded.</p></body></html>'
-                });
-            }
+            // Instead of redirecting, let the content script handle the blocking
+            // The content script will show the overlay when the page loads
+            console.log('Navigation blocked - content script will handle display');
         }
     } catch (e) {
         console.log('Error in navigation blocking:', e);

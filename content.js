@@ -16,19 +16,10 @@
             
             if (website && website.isLocked) {
                 // This website is locked due to time limit exceeded
-                console.log('🔒 Website is locked, redirecting to blocked page');
+                console.log('�� Website is locked, showing blocking overlay');
                 
-                // Get the blocked page URL and verify it's valid
-                const blockedUrl = chrome.runtime.getURL('blocked.html');
-                console.log('🔒 Blocked URL:', blockedUrl);
-                
-                if (blockedUrl && blockedUrl.startsWith('chrome-extension://') && !blockedUrl.includes('invalid')) {
-                    window.location.href = blockedUrl;
-                } else {
-                    console.error('❌ Invalid blocked URL:', blockedUrl);
-                    // Fallback: show blocking overlay
-                    createBlockingOverlay();
-                }
+                // Instead of redirecting, show the blocking overlay directly
+                createTimeLimitBlockingOverlay(website);
                 return;
             }
             
@@ -66,24 +57,42 @@
             animation: slideIn 0.5s ease;
         `;
         
-        warning.innerHTML = `
-            <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                <span style="font-size: 24px; margin-right: 10px;">⚠️</span>
-                <h3 style="margin: 0; font-size: 16px;">Time Warning!</h3>
-            </div>
-            <p style="margin: 0 0 15px 0; font-size: 14px; line-height: 1.4;">
-                You have <strong>${timeRemaining} minutes</strong> remaining on ${website.domain}
-            </p>
-            <button id="dismiss-warning" style="
-                background: rgba(255,255,255,0.9);
-                border: none;
-                padding: 8px 16px;
-                border-radius: 6px;
-                cursor: pointer;
-                font-size: 12px;
-                font-weight: 500;
-            ">Dismiss</button>
+        // Create content using DOM methods instead of innerHTML
+        const headerDiv = document.createElement('div');
+        headerDiv.style.cssText = 'display: flex; align-items: center; margin-bottom: 10px;';
+        
+        const iconSpan = document.createElement('span');
+        iconSpan.style.cssText = 'font-size: 24px; margin-right: 10px;';
+        iconSpan.textContent = '⚠️';
+        
+        const title = document.createElement('h3');
+        title.style.cssText = 'margin: 0; font-size: 16px;';
+        title.textContent = 'Time Warning!';
+        
+        headerDiv.appendChild(iconSpan);
+        headerDiv.appendChild(title);
+        
+        const message = document.createElement('p');
+        message.style.cssText = 'margin: 0 0 15px 0; font-size: 14px; line-height: 1.4;';
+        message.innerHTML = `You have <strong>${timeRemaining} minutes</strong> remaining on ${website.domain}`;
+        
+        const dismissBtn = document.createElement('button');
+        dismissBtn.id = 'dismiss-warning';
+        dismissBtn.style.cssText = `
+            background: rgba(255,255,255,0.9);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
         `;
+        dismissBtn.textContent = 'Dismiss';
+        
+        // Assemble the warning
+        warning.appendChild(headerDiv);
+        warning.appendChild(message);
+        warning.appendChild(dismissBtn);
         
         // Add CSS animation
         const style = document.createElement('style');
@@ -96,7 +105,7 @@
         document.head.appendChild(style);
         
         // Add event listener to dismiss button
-        warning.querySelector('#dismiss-warning').addEventListener('click', function() {
+        dismissBtn.addEventListener('click', function() {
             warning.remove();
         });
         
@@ -178,72 +187,211 @@
             text-align: center;
         `;
         
-        overlay.innerHTML = `
-            <div style="max-width: 500px; padding: 40px;">
-                <h1 style="font-size: 48px; margin-bottom: 20px;">🚫</h1>
-                <h2 style="font-size: 32px; margin-bottom: 16px; font-weight: 600;">Website Blocked</h2>
-                <p style="font-size: 18px; margin-bottom: 24px; opacity: 0.9;">
-                    This website has been blocked by the ZenFocus extension to help you achieve zen-like focus.
-                </p>
-                <div style="display: flex; gap: 16px; justify-content: center;">
-                    <button id="go-back-btn" style="
-                        padding: 12px 24px;
-                        background: rgba(255, 255, 255, 0.2);
-                        border: 2px solid rgba(255, 255, 255, 0.3);
-                        border-radius: 8px;
-                        color: white;
-                        font-size: 16px;
-                        cursor: pointer;
-                        transition: all 0.3s ease;
-                    ">Go Back</button>
-                    <button id="manage-sites-btn" style="
-                        padding: 12px 24px;
-                        background: rgba(255, 255, 255, 0.9);
-                        border: none;
-                        border-radius: 8px;
-                        color: #333;
-                        font-size: 16px;
-                        cursor: pointer;
-                        transition: all 0.3s ease;
-                    ">Manage Sites</button>
-                </div>
-            </div>
+        // Create content using DOM methods instead of innerHTML
+        const contentDiv = document.createElement('div');
+        contentDiv.style.cssText = 'max-width: 500px; padding: 40px;';
+        
+        const icon = document.createElement('h1');
+        icon.style.cssText = 'font-size: 48px; margin-bottom: 20px;';
+        icon.textContent = '🚫';
+        
+        const title = document.createElement('h2');
+        title.style.cssText = 'font-size: 32px; margin-bottom: 16px; font-weight: 600;';
+        title.textContent = 'Website Blocked';
+        
+        const description = document.createElement('p');
+        description.style.cssText = 'font-size: 18px; margin-bottom: 24px; opacity: 0.9;';
+        description.textContent = 'This website has been blocked by the ZenFocus extension to help you achieve zen-like focus.';
+        
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.cssText = 'display: flex; gap: 16px; justify-content: center;';
+        
+        const goBackBtn = document.createElement('button');
+        goBackBtn.id = 'go-back-btn';
+        goBackBtn.style.cssText = `
+            padding: 12px 24px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
         `;
+        goBackBtn.textContent = 'Go Back';
+        
+        const manageSitesBtn = document.createElement('button');
+        manageSitesBtn.id = 'manage-sites-btn';
+        manageSitesBtn.style.cssText = `
+            padding: 12px 24px;
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: 8px;
+            color: #333;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        `;
+        manageSitesBtn.textContent = 'Manage Sites';
         
         // Add event listeners
-        overlay.querySelector('#go-back-btn').addEventListener('click', function() {
+        goBackBtn.addEventListener('click', function() {
             window.history.back();
         });
         
-        overlay.querySelector('#manage-sites-btn').addEventListener('click', function() {
+        manageSitesBtn.addEventListener('click', function() {
             chrome.runtime.sendMessage({ action: 'openPopup' });
         });
         
         // Add hover effects
-        const buttons = overlay.querySelectorAll('button');
-        buttons.forEach(button => {
-            button.addEventListener('mouseenter', function() {
-                if (this.id === 'go-back-btn') {
-                    this.style.background = 'rgba(255, 255, 255, 0.3)';
-                } else {
-                    this.style.background = 'rgba(255, 255, 255, 1)';
-                }
-            });
-            
-            button.addEventListener('mouseleave', function() {
-                if (this.id === 'go-back-btn') {
-                    this.style.background = 'rgba(255, 255, 255, 0.2)';
-                } else {
-                    this.style.background = 'rgba(255, 255, 255, 0.9)';
-                }
-            });
+        goBackBtn.addEventListener('mouseenter', function() {
+            this.style.background = 'rgba(255, 255, 255, 0.3)';
         });
+        
+        goBackBtn.addEventListener('mouseleave', function() {
+            this.style.background = 'rgba(255, 255, 255, 0.2)';
+        });
+        
+        manageSitesBtn.addEventListener('mouseenter', function() {
+            this.style.background = 'rgba(255, 255, 255, 1)';
+        });
+        
+        manageSitesBtn.addEventListener('mouseleave', function() {
+            this.style.background = 'rgba(255, 255, 255, 0.9)';
+        });
+        
+        // Assemble the overlay
+        buttonContainer.appendChild(goBackBtn);
+        buttonContainer.appendChild(manageSitesBtn);
+        
+        contentDiv.appendChild(icon);
+        contentDiv.appendChild(title);
+        contentDiv.appendChild(description);
+        contentDiv.appendChild(buttonContainer);
+        
+        overlay.appendChild(contentDiv);
         
         // Insert overlay
         document.body.appendChild(overlay);
         
         // Prevent scrolling
         document.body.style.overflow = 'hidden';
+    }
+    
+    // Create a blocking overlay when time limit is exceeded
+    function createTimeLimitBlockingOverlay(website) {
+        // Remove any existing overlay
+        const existingOverlay = document.getElementById('time-limit-blocking-overlay');
+        if (existingOverlay) {
+            existingOverlay.remove();
+        }
+        
+        const timeOver = website.timeSpent - website.timeLimit;
+        
+        const overlay = document.createElement('div');
+        overlay.id = 'time-limit-blocking-overlay';
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            z-index: 999999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            text-align: center;
+        `;
+        
+        // Create content using DOM methods instead of innerHTML
+        const contentDiv = document.createElement('div');
+        contentDiv.style.cssText = 'max-width: 600px; padding: 40px;';
+        
+        // Timer icon
+        const iconDiv = document.createElement('div');
+        iconDiv.style.cssText = 'font-size: 80px; margin-bottom: 30px;';
+        iconDiv.textContent = '⏰';
+        
+        // Main heading
+        const heading = document.createElement('h1');
+        heading.style.cssText = 'font-size: 48px; margin-bottom: 20px; font-weight: 700;';
+        heading.textContent = 'Time Limit Exceeded!';
+        
+        // Subtitle
+        const subtitle = document.createElement('p');
+        subtitle.style.cssText = 'font-size: 24px; margin-bottom: 30px; opacity: 0.9; font-weight: 300;';
+        subtitle.textContent = `Daily time limit exceeded for ${website.domain}`;
+        
+        // Description
+        const description = document.createElement('p');
+        description.style.cssText = 'font-size: 18px; margin-bottom: 40px; opacity: 0.8; line-height: 1.6;';
+        description.innerHTML = `You spent <strong>${website.timeSpent} minutes</strong> on this website today, 
+            which exceeds your limit of <strong>${website.timeLimit} minutes</strong>.<br>
+            <strong>${timeOver} minutes over limit.</strong><br><br>
+            This website is now locked until tomorrow, or you can reset it manually in the extension.<br><br>
+            <em style="opacity: 0.7;">To continue browsing, close this tab or navigate to a different website.</em>`;
+        
+        // Stats container
+        const statsContainer = document.createElement('div');
+        statsContainer.style.cssText = 'margin-top: 50px; padding: 30px; background: rgba(255, 255, 255, 0.1); border-radius: 16px; backdrop-filter: blur(10px);';
+        
+        const statsHeading = document.createElement('h3');
+        statsHeading.style.cssText = 'margin-bottom: 20px; font-size: 20px; opacity: 0.9;';
+        statsHeading.textContent = "Today's Progress";
+        
+        const statsGrid = document.createElement('div');
+        statsGrid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px;';
+        
+        // Minutes Used stat
+        const minutesUsedStat = createStatItem(website.timeSpent, 'Minutes Used');
+        const dailyLimitStat = createStatItem(website.timeLimit, 'Daily Limit');
+        const overLimitStat = createStatItem(timeOver, 'Over Limit', '#ffc107');
+        
+        statsGrid.appendChild(minutesUsedStat);
+        statsGrid.appendChild(dailyLimitStat);
+        statsGrid.appendChild(overLimitStat);
+        
+        statsContainer.appendChild(statsHeading);
+        statsContainer.appendChild(statsGrid);
+        
+        // Assemble the overlay
+        contentDiv.appendChild(iconDiv);
+        contentDiv.appendChild(heading);
+        contentDiv.appendChild(subtitle);
+        contentDiv.appendChild(description);
+        contentDiv.appendChild(statsContainer);
+        overlay.appendChild(contentDiv);
+        
+        // Insert overlay
+        document.body.appendChild(overlay);
+        
+        // Prevent scrolling
+        document.body.style.overflow = 'hidden';
+        
+        console.log('🔒 Time limit blocking overlay created');
+    }
+    
+    // Helper function to create stat items
+    function createStatItem(value, label, color = 'white') {
+        const statItem = document.createElement('div');
+        statItem.style.cssText = 'text-align: center;';
+        
+        const valueDiv = document.createElement('div');
+        valueDiv.style.cssText = `font-size: 32px; font-weight: 700; margin-bottom: 8px; color: ${color};`;
+        valueDiv.textContent = value;
+        
+        const labelDiv = document.createElement('div');
+        labelDiv.style.cssText = 'font-size: 14px; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.5px;';
+        labelDiv.textContent = label;
+        
+        statItem.appendChild(valueDiv);
+        statItem.appendChild(labelDiv);
+        
+        return statItem;
     }
     
     // Listen for messages from background script
@@ -255,17 +403,22 @@
             // Background script is telling us to block immediately
             console.log('🔒 Received immediate block command');
             
-            // Get the blocked page URL and verify it's valid
-            const blockedUrl = chrome.runtime.getURL('blocked.html');
-            console.log('🔒 Blocked URL from message:', blockedUrl);
+            // Get the website info to show in the overlay
+            chrome.storage.sync.get(['websites'], function(result) {
+                const websites = result.websites || [];
+                const currentDomain = window.location.hostname.toLowerCase();
+                const website = websites.find(w => 
+                    w.domain === currentDomain || currentDomain.endsWith('.' + w.domain)
+                );
+                
+                if (website) {
+                    createTimeLimitBlockingOverlay(website);
+                } else {
+                    // Fallback if website not found
+                    createGenericBlockingOverlay();
+                }
+            });
             
-            if (blockedUrl && blockedUrl.startsWith('chrome-extension://') && !blockedUrl.includes('invalid')) {
-                window.location.href = blockedUrl;
-            } else {
-                console.error('❌ Invalid blocked URL from message:', blockedUrl);
-                // Fallback: show blocking overlay
-                createBlockingOverlay();
-            }
             sendResponse({ success: true });
         } else if (request.action === 'showWarning') {
             // Background script is telling us to show a warning
@@ -273,6 +426,59 @@
             sendResponse({ success: true });
         }
     });
+    
+    // Create a generic blocking overlay if website info is not available
+    function createGenericBlockingOverlay() {
+        const overlay = document.createElement('div');
+        overlay.id = 'generic-blocking-overlay';
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            z-index: 999999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            text-align: center;
+        `;
+        
+        // Create content using DOM methods instead of innerHTML
+        const contentDiv = document.createElement('div');
+        contentDiv.style.cssText = 'max-width: 600px; padding: 40px;';
+        
+        // Timer icon
+        const iconDiv = document.createElement('div');
+        iconDiv.style.cssText = 'font-size: 80px; margin-bottom: 30px;';
+        iconDiv.textContent = '⏰';
+        
+        // Main heading
+        const heading = document.createElement('h1');
+        heading.style.cssText = 'font-size: 48px; margin-bottom: 20px; font-weight: 700;';
+        heading.textContent = 'Time Limit Exceeded!';
+        
+        // Description
+        const description = document.createElement('p');
+        description.style.cssText = 'font-size: 18px; margin-bottom: 40px; opacity: 0.8; line-height: 1.6;';
+        description.innerHTML = `This website has been locked due to exceeding your daily time limit.<br><br>
+            The lock will reset tomorrow, or you can reset it manually in the extension.<br><br>
+            <em style="opacity: 0.7;">To continue browsing, close this tab or navigate to a different website.</em>`;
+        
+        // Assemble the overlay
+        contentDiv.appendChild(iconDiv);
+        contentDiv.appendChild(heading);
+        contentDiv.appendChild(description);
+        overlay.appendChild(contentDiv);
+        
+        // Insert overlay
+        document.body.appendChild(overlay);
+        document.body.style.overflow = 'hidden';
+    }
     
     // Run initial checks
     if (document.readyState === 'loading') {
